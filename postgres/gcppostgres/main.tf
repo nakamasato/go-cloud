@@ -18,7 +18,7 @@ terraform {
   required_version = ">= 1.1.0"
   required_providers {
     google = {
-      version = "4.40.0"
+      version = "4.46.0"
     }
     random = {
       version = "3.4.3"
@@ -39,6 +39,11 @@ variable "project" {
 variable "user_email" {
   type        = string
   description = "User email address - Google identity to be used for testing IAM authentication."
+}
+
+variable "sa_name" {
+  type = string
+  description = "Service account name - Name of the service account to be used for testing IAM authentication."
 }
 
 variable "region" {
@@ -69,10 +74,22 @@ resource "random_id" "sql_instance" {
   byte_length = 12
 }
 
+
+resource "google_service_account" "service_account" {
+  account_id   = var.sa_name
+  display_name = var.sa_name
+}
+
 resource "google_project_iam_member" "cloudsql_client" {
   project = var.project
   role    = "roles/cloudsql.client"
   member  = "user:${var.user_email}"
+}
+
+resource "google_project_iam_member" "cloudsql_client_for_service_account" {
+  project = var.project
+  role    = "roles/cloudsql.client"
+  member  = google_service_account.service_account.member
 }
 
 resource "google_project_iam_member" "cloudsql_instanceUser" {
@@ -81,11 +98,18 @@ resource "google_project_iam_member" "cloudsql_instanceUser" {
   member  = "user:${var.user_email}"
 }
 
+resource "google_project_iam_member" "cloudsql_instanceUser_for_service_account" {
+  project = var.project
+  role    = "roles/cloudsql.instanceUser"
+  member  = google_service_account.service_account.member
+}
+
 resource "google_sql_database_instance" "main" {
   name             = local.sql_instance
   database_version = "POSTGRES_9_6"
   region           = var.region
   project          = var.project
+  deletion_protection = false
 
   settings {
     tier      = "db-f1-micro"
@@ -132,6 +156,12 @@ resource "google_sql_user" "user_account" {
   instance = google_sql_database_instance.main.name
 }
 
+resource "google_sql_user" "service_account" {
+  type     = "CLOUD_IAM_SERVICE_ACCOUNT"
+  name     = "${google_service_account.service_account.account_id}@${var.project}.iam"
+  instance = google_sql_database_instance.main.name
+}
+
 output "project" {
   value       = var.project
   description = "The GCP project ID."
@@ -166,4 +196,9 @@ output "database" {
 output "user_email" {
   value       = var.user_email
   description = "The email of a GCP service account used for testing connections."
+}
+
+output "cloud_sql_user_sa" {
+  value = google_sql_user.service_account.name
+  description = "value of the service account user"
 }

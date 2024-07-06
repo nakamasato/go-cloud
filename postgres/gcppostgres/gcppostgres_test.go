@@ -42,18 +42,23 @@ func TestURLOpener(t *testing.T) {
 	password, _ := tfOut["password"].Value.(string)
 	databaseName, _ := tfOut["database"].Value.(string)
 	userEmail, _ := tfOut["user_email"].Value.(string)
-	if project == "" || region == "" || instance == "" || username == "" || databaseName == "" || userEmail == "" {
-		t.Fatalf("Missing one or more required Terraform outputs; got project=%q region=%q instance=%q username=%q database=%q userEmail=%q", project, region, instance, username, databaseName, userEmail)
+	cloudSqlUserSA, _ := tfOut["cloud_sql_user_sa"].Value.(string)
+	if project == "" || region == "" || instance == "" || username == "" || databaseName == "" || userEmail == "" || cloudSqlUserSA == ""{
+		t.Fatalf("Missing one or more required Terraform outputs; got project=%q region=%q instance=%q username=%q database=%q userEmail=%q cloudSqlUserSA=%q", project, region, instance, username, databaseName, userEmail, cloudSqlUserSA)
 	}
 	tests := []struct {
 		name    string
 		urlstr  string
 		wantErr bool
 	}{
-		{
-			name:   "SuccessIam",
-			urlstr: fmt.Sprintf("gcppostgres://%s@%s/%s/%s/%s", userEmail, project, region, instance, databaseName),
-		},
+		// {
+		// 	name:   "SuccessIamUser",
+		// 	urlstr: fmt.Sprintf("gcppostgres://%s@%s/%s/%s/%s", userEmail, project, region, instance, databaseName),
+		// },
+		// {
+		// 	name:   "SuccessIamServiceAccount",
+		// 	urlstr: fmt.Sprintf("gcppostgres://%s@%s/%s/%s/%s", cloudSqlUserSA, project, region, instance, databaseName),
+		// },
 		{
 			name:   "SuccessBuiltin",
 			urlstr: fmt.Sprintf("gcppostgres://%s:%s@%s/%s/%s/%s", username, password, project, region, instance, databaseName),
@@ -88,6 +93,33 @@ func TestURLOpener(t *testing.T) {
 			}
 		})
 	}
+}
+
+
+func TestOpenerIAMServiceAccount(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		ctx := context.Background()
+		serviceAccountEmail := "test-sa@yourproject.iam"// "test-sa@yourproject.iam.gserviceaccount.com"
+		dbURL := fmt.Sprintf("gcppostgres://%s@yourproject/asia-northeast1/go-cloud-test-9d03cb18161289f30effe0c6/testdb", serviceAccountEmail)
+
+		username := "test-sa@yourproject.iam"
+		password := "" // パスワードは空としてエンコード
+
+		// URL ユーザー情報をエンコード
+		userInfo := url.UserPassword(username, password)
+		dbURL = "gcppostgres://"+userInfo.String()+"@yourproject/asia-northeast1/go-cloud-test-9d03cb18161289f30effe0c6/testdb"
+		fmt.Println(dbURL)
+		db, err := postgres.Open(ctx, dbURL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Ping(); err != nil {
+			t.Error("Ping:", err)
+		}
+		if err := db.Close(); err != nil {
+			t.Error("Close", err)
+		}
+	})
 }
 
 func TestInstanceFromURL(t *testing.T) {

@@ -64,6 +64,7 @@ type lazyCredsOpener struct {
 }
 
 func (o *lazyCredsOpener) OpenPostgresURL(ctx context.Context, u *url.URL) (*sql.DB, error) {
+	fmt.Println("OpenPostgresURL")
 	o.init.Do(func() {
 		creds, err := gcp.DefaultCredentials(ctx)
 		if err != nil {
@@ -81,6 +82,7 @@ func (o *lazyCredsOpener) OpenPostgresURL(ctx context.Context, u *url.URL) (*sql
 	if o.err != nil {
 		return nil, fmt.Errorf("gcppostgres open %v: %v", u, o.err)
 	}
+	fmt.Println("OpenPostgresURL done")
 	return o.opener.OpenPostgresURL(ctx, u)
 }
 
@@ -120,6 +122,7 @@ func (uo *URLOpener) OpenPostgresURL(ctx context.Context, u *url.URL) (*sql.DB, 
 	u2.Host = "cloudsql"
 	u2.Path = "/" + dbName
 	u2.RawQuery = query.Encode()
+	fmt.Printf("pgConn: %s\n", u2.String())
 	db := sql.OpenDB(connector{
 		client: &proxy.Client{
 			Port:  3307,

@@ -18,6 +18,7 @@ package gcp // import "gocloud.dev/gcp"
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/google/wire"
@@ -81,6 +82,7 @@ func DefaultCredentials(ctx context.Context) (*google.Credentials, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(adc.TokenSource)
 	return adc, nil
 }
 
